@@ -4,8 +4,16 @@ import cn.bobasyu.core.common.RpcDecoder;
 import cn.bobasyu.core.common.RpcEncoder;
 import cn.bobasyu.core.common.RpcInvocation;
 import cn.bobasyu.core.common.RpcProtocol;
+import cn.bobasyu.core.common.event.RpcListenerLoader;
 import cn.bobasyu.core.config.ClientConfig;
+import cn.bobasyu.core.config.PropertiesBootstrap;
+import cn.bobasyu.core.proxy.javassist.JavassistProxyFactory;
 import cn.bobasyu.core.proxy.jdk.JDKProxyFactory;
+import cn.bobasyu.core.registry.URL;
+import cn.bobasyu.core.registry.zookeeper.AbstractRegister;
+import cn.bobasyu.core.registry.zookeeper.AbstractZookeeperClient;
+import cn.bobasyu.core.registry.zookeeper.ZookeeperRegister;
+import cn.bobasyu.core.utils.CommonUtils;
 import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
@@ -17,6 +25,9 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
+import static cn.bobasyu.core.common.cache.CommonClientCache.SUBSCRIBE_SERVICE_LIST;
 import static cn.bobasyu.core.common.cache.CommonServerCache.SEND_QUEUE;
 
 /**
@@ -31,31 +42,81 @@ public class Client {
 
     private ClientConfig clientConfig;
 
-    public Client(ClientConfig clientConfig) {
+    private AbstractRegister abstractRegister;
+
+    private RpcListenerLoader rpcListenerLoader;
+
+    private Bootstrap bootstrap = new Bootstrap();
+
+    public Bootstrap getBootstrap() {
+        return bootstrap;
+    }
+
+    public ClientConfig getClientConfig() {
+        return clientConfig;
+    }
+
+    public void setClientConfig(ClientConfig clientConfig) {
         this.clientConfig = clientConfig;
     }
 
-    public RpcReference startClientApplication() throws InterruptedException {
-        EventLoopGroup clientGroup = new NioEventLoopGroup();
-        Bootstrap bootstrap = new Bootstrap();
-        bootstrap.group(clientGroup);
-        bootstrap.channel(NioSocketChannel.class);
-        bootstrap.handler(new ChannelInitializer<SocketChannel>() {
-            @Override
-            protected void initChannel(SocketChannel socketChannel) throws Exception {
-                socketChannel.pipeline().addLast(new RpcEncoder());
-                socketChannel.pipeline().addLast(new RpcDecoder());
-                socketChannel.pipeline().addLast(new ClientHandler());
+    public RpcReference initClientApplication() {
+        this.bootstrap.group(this.clientGroup)
+                .channel(NioSocketChannel.class)
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel socketChannel) throws Exception {
+                        socketChannel.pipeline().addLast(new RpcEncoder());
+                        socketChannel.pipeline().addLast(new RpcDecoder());
+                        socketChannel.pipeline().addLast(new ClientHandler());
+                    }
+                });
+
+        this.rpcListenerLoader = new RpcListenerLoader();
+        this.rpcListenerLoader.init();
+        this.clientConfig = PropertiesBootstrap.loadClientConfigFromLocal();
+
+        if ("javassist".equals(this.clientConfig.getProxyType())) {
+            return new RpcReference(new JavassistProxyFactory());
+        } else {
+            return new RpcReference(new JDKProxyFactory());
+        }
+    }
+
+    /**
+     * 启动服务之前需要预先订阅对应的dubbo服务
+     *
+     * @param serviceBean
+     */
+    public void doSubscribeService(Class<?> serviceBean) {
+        if (this.abstractRegister == null) {
+            this.abstractRegister = new ZookeeperRegister(this.clientConfig.getRegisterAddr());
+        }
+        URL url = new URL();
+        url.setApplicationName(this.clientConfig.getApplicationName());
+        url.setServiceName(serviceBean.getName());
+        url.addParameter("host", CommonUtils.getIpAddress());
+        this.abstractRegister.subscribe(url);
+    }
+
+    /**
+     * 开始和各个provider建立连接
+     */
+    public void doConnectServer() {
+        for (String providerServiceName : SUBSCRIBE_SERVICE_LIST) {
+            List<String> providerIps = this.abstractRegister.getProviderIps(providerServiceName);
+            for (String providerIp : providerIps) {
+                try {
+                    ConnectionHandler.connect(providerServiceName, providerIp);
+                } catch (InterruptedException e) {
+                    this.logger.error("[doConnectServer] connect fail ", e);
+                }
             }
-        });
-
-        ChannelFuture channelFuture = bootstrap.connect(clientConfig.getServerAddr(), clientConfig.getPort());
-        logger.info("============ 服务启动 ============");
-        this.startClient(channelFuture);
-
-        // 注入代理工厂
-        RpcReference rpcReference = new RpcReference(new JDKProxyFactory());
-        return rpcReference;
+            URL url = new URL();
+            url.setServiceName(providerServiceName);
+            // 客户端在此新增一个订阅功能
+            this.abstractRegister.doAfterSubscribe(url);
+        }
     }
 
     /**
