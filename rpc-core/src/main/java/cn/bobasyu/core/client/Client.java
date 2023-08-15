@@ -13,6 +13,8 @@ import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.registry.zookeeper.AbstractRegister;
 import cn.bobasyu.core.registry.zookeeper.AbstractZookeeperClient;
 import cn.bobasyu.core.registry.zookeeper.ZookeeperRegister;
+import cn.bobasyu.core.router.RandomRouterImpl;
+import cn.bobasyu.core.router.RotateRouterImpl;
 import cn.bobasyu.core.utils.CommonUtils;
 import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
@@ -27,6 +29,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
+import static cn.bobasyu.core.common.RpcConstants.RANDOM_ROUTER_TYPE;
+import static cn.bobasyu.core.common.RpcConstants.ROTATE_ROUTER_TYPE;
+import static cn.bobasyu.core.common.cache.CommonClientCache.ROUTER;
 import static cn.bobasyu.core.common.cache.CommonClientCache.SUBSCRIBE_SERVICE_LIST;
 import static cn.bobasyu.core.common.cache.CommonServerCache.SEND_QUEUE;
 
@@ -61,16 +66,14 @@ public class Client {
     }
 
     public RpcReference initClientApplication() {
-        this.bootstrap.group(this.clientGroup)
-                .channel(NioSocketChannel.class)
-                .handler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    protected void initChannel(SocketChannel socketChannel) throws Exception {
-                        socketChannel.pipeline().addLast(new RpcEncoder());
-                        socketChannel.pipeline().addLast(new RpcDecoder());
-                        socketChannel.pipeline().addLast(new ClientHandler());
-                    }
-                });
+        this.bootstrap.group(this.clientGroup).channel(NioSocketChannel.class).handler(new ChannelInitializer<SocketChannel>() {
+            @Override
+            protected void initChannel(SocketChannel socketChannel) throws Exception {
+                socketChannel.pipeline().addLast(new RpcEncoder());
+                socketChannel.pipeline().addLast(new RpcDecoder());
+                socketChannel.pipeline().addLast(new ClientHandler());
+            }
+        });
 
         this.rpcListenerLoader = new RpcListenerLoader();
         this.rpcListenerLoader.init();
@@ -114,6 +117,8 @@ public class Client {
             }
             URL url = new URL();
             url.setServiceName(providerServiceName);
+            url.addParameter("servicePath", providerServiceName + "/provider");
+            url.addParameter("providerIps", JSON.toJSONString(providerIps));
             // 客户端在此新增一个订阅功能
             this.abstractRegister.doAfterSubscribe(url);
         }
@@ -156,6 +161,19 @@ public class Client {
                     e.printStackTrace();
                 }
             }
+        }
+    }
+
+    /**
+     * 初始化路由策略
+     */
+    private void initClientConfig() {
+        // 初始化路由策略
+        String routerStrategy = clientConfig.getRouterStrategy();
+        if (RANDOM_ROUTER_TYPE.equals(routerStrategy)) {
+            ROUTER = new RandomRouterImpl();
+        } else if (ROTATE_ROUTER_TYPE.equals(routerStrategy)) {
+            ROUTER = new RotateRouterImpl();
         }
     }
 }

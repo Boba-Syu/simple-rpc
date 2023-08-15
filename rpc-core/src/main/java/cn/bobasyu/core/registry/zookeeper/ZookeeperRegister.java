@@ -1,11 +1,13 @@
 package cn.bobasyu.core.registry.zookeeper;
 
+import cn.bobasyu.core.common.event.RpcNodeChangeEvent;
 import cn.bobasyu.core.common.event.RpcEvent;
 import cn.bobasyu.core.common.event.RpcListenerLoader;
 import cn.bobasyu.core.common.event.RpcUpdateEvent;
 import cn.bobasyu.core.common.event.data.URLChangeWrapper;
 import cn.bobasyu.core.registry.RegistryService;
 import cn.bobasyu.core.registry.URL;
+import com.alibaba.fastjson.JSON;
 
 import java.util.List;
 
@@ -71,8 +73,25 @@ public class ZookeeperRegister extends AbstractRegister implements RegistryServi
     @Override
     public void doAfterSubscribe(URL url) {
         //监听是否有新的服务注册
+        String servicePath = url.getParameters().get("servicePath");
         String newServerNodePath = ROOT + "/" + url.getServiceName() + "/provider";
         watchChildNodeData(newServerNodePath);
+        String providerIpStrJson = url.getParameters().get("providerIps");
+        List<String> providerIpList = JSON.parseObject(providerIpStrJson, List.class);
+        for (String providerIp : providerIpList) {
+            this.watchNodeDataChange(ROOT + "/" + servicePath + "/" + providerIp);
+        }
+    }
+
+    public void watchNodeDataChange(String newServerNodePath) {
+        zkClient.watchChildNodeData(newServerNodePath, watchedEvent -> {
+            String path = watchedEvent.getPath();
+            String nodeData = zkClient.getNodeData(path);
+            ProviderNodeInfo providerNodeInfo = URL.buildURLFromUrlStr(nodeData);
+            RpcEvent iRpcEvent = new RpcNodeChangeEvent(providerNodeInfo);
+            RpcListenerLoader.sendEvent(iRpcEvent);
+            watchNodeDataChange(newServerNodePath);
+        });
     }
 
     public void watchChildNodeData(String newServerNodePath) {

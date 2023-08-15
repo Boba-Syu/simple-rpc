@@ -1,6 +1,7 @@
 package cn.bobasyu.core.client;
 
 import cn.bobasyu.core.common.ChannelFutureWrapper;
+import cn.bobasyu.core.router.Selector;
 import cn.bobasyu.core.utils.CommonUtils;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
@@ -10,9 +11,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
 
-
-import static cn.bobasyu.core.common.cache.CommonClientCache.CONNECT_MAP;
-import static cn.bobasyu.core.common.cache.CommonClientCache.SERVER_ADDRESS;
+import static cn.bobasyu.core.common.cache.CommonClientCache.*;
 
 /**
  * URL处理类，当注册中心的节点新增或者移除或者权重变化的时候，这个类主要负责对内存中的url做变更
@@ -60,6 +59,9 @@ public class ConnectionHandler {
         }
         channelFutureWrappers.add(channelFutureWrapper);
         CONNECT_MAP.put(providerServiceName, channelFutureWrappers);
+        Selector selector = new Selector();
+        selector.setProviderServiceName(providerServiceName);
+        ROUTER.refreshRouterArr(selector);
     }
 
     /**
