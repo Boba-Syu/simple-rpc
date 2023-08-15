@@ -1,12 +1,14 @@
 package cn.bobasyu.core.proxy.jdk;
 
 import cn.bobasyu.core.common.RpcInvocation;
+import cn.bobasyu.core.client.RpcReferenceWrapper;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.util.UUID;
 import java.util.concurrent.TimeoutException;
 
+import static cn.bobasyu.core.common.RpcConstants.DEFAULT_TIMEOUT;
 import static cn.bobasyu.core.common.cache.CommonServerCache.RESP_MAP;
 import static cn.bobasyu.core.common.cache.CommonServerCache.SEND_QUEUE;
 
@@ -16,10 +18,14 @@ import static cn.bobasyu.core.common.cache.CommonServerCache.SEND_QUEUE;
 public class JDKClientInvocationHandler implements InvocationHandler {
 
     private final static Object OBJECT = new Object();
-    private Class<?> clazz;
 
-    public JDKClientInvocationHandler(Class<?> clazz) {
-        this.clazz = clazz;
+    private RpcReferenceWrapper rpcReferenceWrapper;
+
+    private int timeOut = DEFAULT_TIMEOUT;
+
+    public JDKClientInvocationHandler(RpcReferenceWrapper<?> rpcReferenceWrapper) {
+        this.rpcReferenceWrapper = rpcReferenceWrapper;
+        timeOut = Integer.valueOf(String.valueOf(rpcReferenceWrapper.getAttachments().get("timeOut")));
     }
 
     @Override
@@ -27,7 +33,7 @@ public class JDKClientInvocationHandler implements InvocationHandler {
         RpcInvocation rpcInvocation = new RpcInvocation();
         rpcInvocation.setArgs(args);
         rpcInvocation.setTargetMethod(method.getName());
-        rpcInvocation.setTargetServiceName(clazz.getName());
+        rpcInvocation.setTargetServiceName(rpcReferenceWrapper.getAimClass().getName());
         // 注入UUID，对每一次的请求都做单独区分
         rpcInvocation.setUuid(UUID.randomUUID().toString());
         RESP_MAP.put(rpcInvocation.getUuid(), OBJECT);

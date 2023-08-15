@@ -4,6 +4,9 @@ import cn.bobasyu.core.common.RpcDecoder;
 import cn.bobasyu.core.common.RpcEncoder;
 import cn.bobasyu.core.config.PropertiesBootstrap;
 import cn.bobasyu.core.config.ServerConfig;
+import cn.bobasyu.core.filter.server.ServerFilterChain;
+import cn.bobasyu.core.filter.server.ServerLogFilterImpl;
+import cn.bobasyu.core.filter.server.ServerTokenFilterImpl;
 import cn.bobasyu.core.registry.RegistryService;
 import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.serialize.fastjson.FastJsonSerializeFactory;
@@ -22,8 +25,7 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import static cn.bobasyu.core.common.RpcConstants.*;
 import static cn.bobasyu.core.common.RpcConstants.KRYO_SERIALIZE_TYPE;
 import static cn.bobasyu.core.common.cache.CommonClientCache.CLIENT_SERIALIZE_FACTORY;
-import static cn.bobasyu.core.common.cache.CommonServerCache.PROVIDER_CLASS_MAP;
-import static cn.bobasyu.core.common.cache.CommonServerCache.PROVIDER_URL_SET;
+import static cn.bobasyu.core.common.cache.CommonServerCache.*;
 
 /**
  * 服务端，使用Netty实现
@@ -59,6 +61,12 @@ public class Server {
             default:
                 throw new RuntimeException("no match serialize strategy for" + serializeStrategy);
         }
+        SERVER_CONFIG = serverConfig;
+        // 初始化过滤链，指定过滤顺序
+        ServerFilterChain serverFilterChain = new ServerFilterChain();
+        serverFilterChain.addServerFilter(new ServerLogFilterImpl());
+        serverFilterChain.addServerFilter(new ServerTokenFilterImpl());
+        SERVER_FILTER_CHAN = serverFilterChain;
     }
 
     public void startApplication() {

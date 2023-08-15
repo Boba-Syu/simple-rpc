@@ -10,7 +10,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 
 import java.lang.reflect.Method;
 
-import static cn.bobasyu.core.common.cache.CommonServerCache.PROVIDER_CLASS_MAP;
+import static cn.bobasyu.core.common.cache.CommonServerCache.*;
 
 /**
  * 服务器接收到数据后的处理类
@@ -27,8 +27,9 @@ public class ServerHandler extends ChannelInboundHandlerAdapter {
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         // 服务端接收数据统一以RPCProtocol协议的格式接收
         RpcProtocol rpcProtocol = (RpcProtocol) msg;
-        String json = new String(rpcProtocol.getContent(), 0, rpcProtocol.getContentLength());
-        RpcInvocation rpcInvocation = JSON.parseObject(json, RpcInvocation.class);
+        RpcInvocation rpcInvocation = SERVER_SERIALIZE_FACTORY.deserialize(rpcProtocol.getContent(), RpcInvocation.class);
+        // 责任链调用
+        SERVER_FILTER_CHAN.doFilter(rpcInvocation);
         // PROVIDER_CLASS_MAP为预先在启动时存储的Bean的集合
         Object aimObject = PROVIDER_CLASS_MAP.get(rpcInvocation.getTargetMethod());
         Method[] methods = aimObject.getClass().getDeclaredMethods();

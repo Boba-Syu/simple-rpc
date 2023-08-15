@@ -1,15 +1,16 @@
 package cn.bobasyu.core.client;
 
 import cn.bobasyu.core.common.ChannelFutureWrapper;
+import cn.bobasyu.core.common.RpcInvocation;
 import cn.bobasyu.core.router.Selector;
 import cn.bobasyu.core.utils.CommonUtils;
+import com.esotericsoftware.minlog.Log;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelFuture;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Random;
 
 import static cn.bobasyu.core.common.cache.CommonClientCache.*;
 
@@ -98,17 +99,33 @@ public class ConnectionHandler {
     }
 
     /**
-     * 默认走随机策略获取ChannelFuture
+     * 获得与服务节点的连接
      *
-     * @param providerServiceName
+     * @param rpcInvocation
      * @return
      */
-    public static ChannelFuture getChannelFuture(String providerServiceName) {
-        List<ChannelFutureWrapper> channelFutureWrappers = CONNECT_MAP.get(providerServiceName);
-        if (CommonUtils.isEmptyList(channelFutureWrappers)) {
-            throw new RuntimeException("no provider exist for " + providerServiceName);
+    public static ChannelFuture getChannelFuture(RpcInvocation rpcInvocation) {
+        String providerServiceName = rpcInvocation.getTargetServiceName();
+        ChannelFutureWrapper[] channelFutureWrappers = SERVICE_ROUTER_MAP.get(providerServiceName);
+        if (channelFutureWrappers == null || channelFutureWrappers.length == 0) {
+            rpcInvocation.setRetry(0);
+            rpcInvocation.setE(new RuntimeException("no provider exist for " + providerServiceName));
+            rpcInvocation.setResponse(null);
+            //直接交给响应线程那边处理（响应线程在代理类内部的invoke函数中，那边会取出对应的uuid的值，然后判断）
+            RESP_MAP.put(rpcInvocation.getUuid(), rpcInvocation);
+            Log.error("channelFutureWrapper is null");
+            return null;
         }
-        ChannelFuture channelFuture = channelFutureWrappers.get(new Random().nextInt(channelFutureWrappers.size())).getChannelFuture();
+        List<ChannelFutureWrapper> channelFutureWrappersList = new ArrayList<>(channelFutureWrappers.length);
+        for (int i = 0; i < channelFutureWrappers.length; i++) {
+            channelFutureWrappersList.add(channelFutureWrappers[i]);
+        }
+        // 责任链调用
+        CLIENT_FILTER_CHAN.doFilter(channelFutureWrappersList, rpcInvocation);
+        Selector selector = new Selector();
+        selector.setProviderServiceName(providerServiceName);
+        selector.setChannelFutureWrappers(channelFutureWrappers);
+        ChannelFuture channelFuture = ROUTER.select(selector).getChannelFuture();
         return channelFuture;
     }
 

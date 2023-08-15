@@ -9,6 +9,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 
+import static cn.bobasyu.core.common.cache.CommonClientCache.CLIENT_FILTER_CHAN;
+import static cn.bobasyu.core.common.cache.CommonClientCache.CLIENT_SERIALIZE_FACTORY;
 import static cn.bobasyu.core.common.cache.CommonServerCache.RESP_MAP;
 
 /**
@@ -20,7 +22,7 @@ public class ClientHandler extends ChannelInboundHandlerAdapter {
         RpcProtocol rpcProtocol = (RpcProtocol) msg;
         byte[] reqContent = rpcProtocol.getContent();
         String json = new String(reqContent);
-        RpcInvocation rpcInvocation = JSON.parseObject(json, RpcInvocation.class);
+        RpcInvocation rpcInvocation = CLIENT_SERIALIZE_FACTORY.deserialize(reqContent, RpcInvocation.class);
         // 通过uuid来注入匹配的响应数值
         if (!RESP_MAP.containsKey(rpcInvocation.getUuid())) {
             throw new IllegalArgumentException("server response is error!");

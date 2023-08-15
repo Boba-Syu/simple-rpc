@@ -4,6 +4,7 @@ import cn.bobasyu.core.common.ChannelFuturePollingRef;
 import cn.bobasyu.core.common.ChannelFutureWrapper;
 import cn.bobasyu.core.common.RpcInvocation;
 import cn.bobasyu.core.config.ClientConfig;
+import cn.bobasyu.core.filter.client.ClientFilterChain;
 import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.router.Router;
 import cn.bobasyu.core.serialize.SerializeFactory;
@@ -42,5 +43,7 @@ public class CommonClientCache {
     public static Router ROUTER;
 
     public static SerializeFactory CLIENT_SERIALIZE_FACTORY;
+
+    public static ClientFilterChain CLIENT_FILTER_CHAN;
 
 }

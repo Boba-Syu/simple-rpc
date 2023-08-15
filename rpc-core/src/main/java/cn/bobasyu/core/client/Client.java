@@ -7,6 +7,10 @@ import cn.bobasyu.core.common.RpcProtocol;
 import cn.bobasyu.core.common.event.RpcListenerLoader;
 import cn.bobasyu.core.config.ClientConfig;
 import cn.bobasyu.core.config.PropertiesBootstrap;
+import cn.bobasyu.core.filter.client.ClientFilterChain;
+import cn.bobasyu.core.filter.client.ClientLogFilterImpl;
+import cn.bobasyu.core.filter.client.GroupFilterImpl;
+import cn.bobasyu.core.filter.server.DirectInvokeFilterImpl;
 import cn.bobasyu.core.proxy.javassist.JavassistProxyFactory;
 import cn.bobasyu.core.proxy.jdk.JDKProxyFactory;
 import cn.bobasyu.core.registry.URL;
@@ -200,5 +204,11 @@ public class Client {
             default:
                 throw new RuntimeException("no match serialize strategy for" + serializeStrategy);
         }
+        // 初始化过滤链，指定过滤顺序
+        ClientFilterChain clientFilterChain = new ClientFilterChain();
+        clientFilterChain.addClientFilter(new DirectInvokeFilterImpl());
+        clientFilterChain.addClientFilter(new GroupFilterImpl());
+        clientFilterChain.addClientFilter(new ClientLogFilterImpl());
+        CLIENT_FILTER_CHAN = clientFilterChain;
     }
 }
