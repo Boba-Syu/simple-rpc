@@ -6,6 +6,10 @@ import cn.bobasyu.core.config.PropertiesBootstrap;
 import cn.bobasyu.core.config.ServerConfig;
 import cn.bobasyu.core.registry.RegistryService;
 import cn.bobasyu.core.registry.URL;
+import cn.bobasyu.core.serialize.fastjson.FastJsonSerializeFactory;
+import cn.bobasyu.core.serialize.hessian.HessianSerializeFactory;
+import cn.bobasyu.core.serialize.jdk.JdkSerializeFactory;
+import cn.bobasyu.core.serialize.kryo.KryoSerializeFactory;
 import cn.bobasyu.core.utils.CommonUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
@@ -15,6 +19,9 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
+import static cn.bobasyu.core.common.RpcConstants.*;
+import static cn.bobasyu.core.common.RpcConstants.KRYO_SERIALIZE_TYPE;
+import static cn.bobasyu.core.common.cache.CommonClientCache.CLIENT_SERIALIZE_FACTORY;
 import static cn.bobasyu.core.common.cache.CommonServerCache.PROVIDER_CLASS_MAP;
 import static cn.bobasyu.core.common.cache.CommonServerCache.PROVIDER_URL_SET;
 
@@ -34,6 +41,24 @@ public class Server {
     public void initServerConfig() {
         ServerConfig serverConfig = PropertiesBootstrap.loadServerConfigFromLocal();
         this.setServerConfig(serverConfig);
+        // 初始化序列化策略
+        String serializeStrategy = serverConfig.getServerSerialize();
+        switch (serializeStrategy) {
+            case JDK_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new JdkSerializeFactory();
+                break;
+            case FAST_JSON_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new FastJsonSerializeFactory();
+                break;
+            case HESSIAN2_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new HessianSerializeFactory();
+                break;
+            case KRYO_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new KryoSerializeFactory();
+                break;
+            default:
+                throw new RuntimeException("no match serialize strategy for" + serializeStrategy);
+        }
     }
 
     public void startApplication() {

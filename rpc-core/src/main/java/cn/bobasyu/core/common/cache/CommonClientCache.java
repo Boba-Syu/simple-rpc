@@ -6,6 +6,7 @@ import cn.bobasyu.core.common.RpcInvocation;
 import cn.bobasyu.core.config.ClientConfig;
 import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.router.Router;
+import cn.bobasyu.core.serialize.SerializeFactory;
 
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -39,5 +40,7 @@ public class CommonClientCache {
     public static ChannelFuturePollingRef CHANNEL_FUTURE_POLLING_REF = new ChannelFuturePollingRef();
 
     public static Router ROUTER;
+
+    public static SerializeFactory CLIENT_SERIALIZE_FACTORY;
 
 }

@@ -15,6 +15,10 @@ import cn.bobasyu.core.registry.zookeeper.AbstractZookeeperClient;
 import cn.bobasyu.core.registry.zookeeper.ZookeeperRegister;
 import cn.bobasyu.core.router.RandomRouterImpl;
 import cn.bobasyu.core.router.RotateRouterImpl;
+import cn.bobasyu.core.serialize.fastjson.FastJsonSerializeFactory;
+import cn.bobasyu.core.serialize.hessian.HessianSerializeFactory;
+import cn.bobasyu.core.serialize.jdk.JdkSerializeFactory;
+import cn.bobasyu.core.serialize.kryo.KryoSerializeFactory;
 import cn.bobasyu.core.utils.CommonUtils;
 import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
@@ -29,10 +33,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
-import static cn.bobasyu.core.common.RpcConstants.RANDOM_ROUTER_TYPE;
-import static cn.bobasyu.core.common.RpcConstants.ROTATE_ROUTER_TYPE;
-import static cn.bobasyu.core.common.cache.CommonClientCache.ROUTER;
-import static cn.bobasyu.core.common.cache.CommonClientCache.SUBSCRIBE_SERVICE_LIST;
+import static cn.bobasyu.core.common.RpcConstants.*;
+import static cn.bobasyu.core.common.cache.CommonClientCache.*;
 import static cn.bobasyu.core.common.cache.CommonServerCache.SEND_QUEUE;
 
 /**
@@ -170,10 +172,33 @@ public class Client {
     private void initClientConfig() {
         // 初始化路由策略
         String routerStrategy = clientConfig.getRouterStrategy();
-        if (RANDOM_ROUTER_TYPE.equals(routerStrategy)) {
-            ROUTER = new RandomRouterImpl();
-        } else if (ROTATE_ROUTER_TYPE.equals(routerStrategy)) {
-            ROUTER = new RotateRouterImpl();
+        switch (routerStrategy) {
+            case RANDOM_ROUTER_TYPE:
+                ROUTER = new RandomRouterImpl();
+                break;
+            case ROTATE_ROUTER_TYPE:
+                ROUTER = new RotateRouterImpl();
+                break;
+            default:
+                throw new RuntimeException("no match router strategy for" + routerStrategy);
+        }
+        // 初始化序列化策略
+        String serializeStrategy = clientConfig.getRouterStrategy();
+        switch (serializeStrategy) {
+            case JDK_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new JdkSerializeFactory();
+                break;
+            case FAST_JSON_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new FastJsonSerializeFactory();
+                break;
+            case HESSIAN2_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new HessianSerializeFactory();
+                break;
+            case KRYO_SERIALIZE_TYPE:
+                CLIENT_SERIALIZE_FACTORY = new KryoSerializeFactory();
+                break;
+            default:
+                throw new RuntimeException("no match serialize strategy for" + serializeStrategy);
         }
     }
 }
