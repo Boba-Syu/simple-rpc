@@ -89,6 +89,8 @@ public class Server {
                     }
                 });
         this.batchExportUrl();
+        // 准备接收请求任务
+        SERVER_CHANNEL_DISPATCHER.startDataConsume();
         bootstrap.bind(this.serverConfig.getServerPort());
     }
 
