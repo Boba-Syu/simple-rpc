@@ -8,6 +8,7 @@ import cn.bobasyu.core.filter.client.ClientFilterChain;
 import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.router.Router;
 import cn.bobasyu.core.serialize.SerializeFactory;
+import cn.bobasyu.core.spi.ExtensionLoader;
 
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -44,6 +45,8 @@ public class CommonClientCache {
 
     public static SerializeFactory CLIENT_SERIALIZE_FACTORY;
 
-    public static ClientFilterChain CLIENT_FILTER_CHAN;
+    public static ClientFilterChain CLIENT_FILTER_CHAIN;
+
+    public static ExtensionLoader EXTENSION_LOADER = new ExtensionLoader();
 
 }

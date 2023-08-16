@@ -1,0 +1,2 @@
+jdk=cn.bobasyu.core.proxy.jdk.JDKProxyFactory
+javassist=cn.bobasyu.core.proxy.javassist.JavassistProxyFactory

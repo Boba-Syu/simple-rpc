@@ -121,7 +121,7 @@ public class ConnectionHandler {
             channelFutureWrappersList.add(channelFutureWrappers[i]);
         }
         // 责任链调用
-        CLIENT_FILTER_CHAN.doFilter(channelFutureWrappersList, rpcInvocation);
+        CLIENT_FILTER_CHAIN.doFilter(channelFutureWrappersList, rpcInvocation);
         Selector selector = new Selector();
         selector.setProviderServiceName(providerServiceName);
         selector.setChannelFutureWrappers(channelFutureWrappers);

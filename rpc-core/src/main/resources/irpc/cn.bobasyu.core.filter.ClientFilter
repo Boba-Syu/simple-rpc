@@ -1,0 +1,3 @@
+clientLogFilterImpl=cn.bobasyu.core.filter.client.ClientLogFilterImpl
+directInvokeFilterImpl=cn.bobasyu.core.filter.client.DirectInvokeFilterImpl
+groupFilterImpl=cn.bobasyu.core.filter.client.GroupFilterImpl

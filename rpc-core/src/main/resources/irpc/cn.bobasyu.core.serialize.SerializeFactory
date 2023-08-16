@@ -1,0 +1,4 @@
+kryo=cn.bobasyu.core.serialize.kryo.KryoSerializeFactory
+jdk=cn.bobasyu.core.serialize.jdk.JdkSerializeFactory
+hessian=cn.bobasyu.core.serialize.hessian.HessianSerializeFactory
+fastJson=cn.bobasyu.core.serialize.fastjson.FastJsonSerializeFactory

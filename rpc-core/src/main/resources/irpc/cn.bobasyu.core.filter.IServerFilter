@@ -1,0 +1,4 @@
+serverLogFilterImpl=cn.bobasyu.core.filter.server.ServerLogFilterImpl
+serverTokenFilterImpl=cn.bobasyu.core.filter.server.ServerTokenFilterImpl
+serverServiceBeforeLimitFilterImpl=cn.bobasyu.core.filter.server.ServerServiceBeforeLimitFilterImpl
+serverServiceAfterLimitFilterImpl=cn.bobasyu.core.filter.server.ServerServiceAfterLimitFilterImpl

@@ -1,0 +1,2 @@
+rotate=cn.bobasyu.core.router.RotateRouterImpl
+random=cn.bobasyu.core.router.RandomRouterImpl

@@ -7,6 +7,7 @@ import cn.bobasyu.core.common.RpcProtocol;
 import cn.bobasyu.core.common.event.RpcListenerLoader;
 import cn.bobasyu.core.config.ClientConfig;
 import cn.bobasyu.core.config.PropertiesBootstrap;
+import cn.bobasyu.core.filter.ClientFilter;
 import cn.bobasyu.core.filter.client.ClientFilterChain;
 import cn.bobasyu.core.filter.client.ClientLogFilterImpl;
 import cn.bobasyu.core.filter.client.GroupFilterImpl;
@@ -15,10 +16,11 @@ import cn.bobasyu.core.proxy.javassist.JavassistProxyFactory;
 import cn.bobasyu.core.proxy.jdk.JDKProxyFactory;
 import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.registry.zookeeper.AbstractRegister;
-import cn.bobasyu.core.registry.zookeeper.AbstractZookeeperClient;
 import cn.bobasyu.core.registry.zookeeper.ZookeeperRegister;
 import cn.bobasyu.core.router.RandomRouterImpl;
 import cn.bobasyu.core.router.RotateRouterImpl;
+import cn.bobasyu.core.router.Router;
+import cn.bobasyu.core.serialize.SerializeFactory;
 import cn.bobasyu.core.serialize.fastjson.FastJsonSerializeFactory;
 import cn.bobasyu.core.serialize.hessian.HessianSerializeFactory;
 import cn.bobasyu.core.serialize.jdk.JdkSerializeFactory;
@@ -35,11 +37,13 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 
 import static cn.bobasyu.core.common.RpcConstants.*;
 import static cn.bobasyu.core.common.cache.CommonClientCache.*;
 import static cn.bobasyu.core.common.cache.CommonServerCache.SEND_QUEUE;
+import static cn.bobasyu.core.spi.ExtensionLoader.EXTENSION_LOADER_CLASS_CACHE;
 
 /**
  * 客户端，使用Netty实现
@@ -173,42 +177,36 @@ public class Client {
     /**
      * 初始化路由策略
      */
-    private void initClientConfig() {
-        // 初始化路由策略
+    private void initClientConfig() throws Exception {
+        //初始化路由策略 多选一
+        EXTENSION_LOADER.loadExtension(Router.class);
         String routerStrategy = clientConfig.getRouterStrategy();
-        switch (routerStrategy) {
-            case RANDOM_ROUTER_TYPE:
-                ROUTER = new RandomRouterImpl();
-                break;
-            case ROTATE_ROUTER_TYPE:
-                ROUTER = new RotateRouterImpl();
-                break;
-            default:
-                throw new RuntimeException("no match router strategy for" + routerStrategy);
+        LinkedHashMap<String, Class<?>> iRouterMap = EXTENSION_LOADER_CLASS_CACHE.get(Router.class.getName());
+        Class<?> routerClass = iRouterMap.get(routerStrategy);
+        if (routerClass == null) {
+            throw new RuntimeException("no match routerStrategy for " + routerStrategy);
         }
-        // 初始化序列化策略
-        String serializeStrategy = clientConfig.getRouterStrategy();
-        switch (serializeStrategy) {
-            case JDK_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new JdkSerializeFactory();
-                break;
-            case FAST_JSON_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new FastJsonSerializeFactory();
-                break;
-            case HESSIAN2_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new HessianSerializeFactory();
-                break;
-            case KRYO_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new KryoSerializeFactory();
-                break;
-            default:
-                throw new RuntimeException("no match serialize strategy for" + serializeStrategy);
+        ROUTER = (Router) routerClass.newInstance();
+        // 初始化序列化框架 多选一
+        EXTENSION_LOADER.loadExtension(SerializeFactory.class);
+        String clientSerialize = clientConfig.getClientSerialize();
+        LinkedHashMap<String, Class<?>> serializeMap = EXTENSION_LOADER_CLASS_CACHE.get(SerializeFactory.class.getName());
+        Class<?> serializeFactoryClass = serializeMap.get(clientSerialize);
+        if (serializeFactoryClass == null) {
+            throw new RuntimeException("no match serialize type for " + clientSerialize);
         }
-        // 初始化过滤链，指定过滤顺序
+        CLIENT_SERIALIZE_FACTORY = (SerializeFactory) serializeFactoryClass.newInstance();
+        // 初始化过滤链 全部添加
+        EXTENSION_LOADER.loadExtension(ClientFilter.class);
         ClientFilterChain clientFilterChain = new ClientFilterChain();
-        clientFilterChain.addClientFilter(new DirectInvokeFilterImpl());
-        clientFilterChain.addClientFilter(new GroupFilterImpl());
-        clientFilterChain.addClientFilter(new ClientLogFilterImpl());
-        CLIENT_FILTER_CHAN = clientFilterChain;
+        LinkedHashMap<String, Class<?>> iClientMap = EXTENSION_LOADER_CLASS_CACHE.get(ClientFilter.class.getName());
+        for (String implClassName : iClientMap.keySet()) {
+            Class<?> iClientFilterClass = iClientMap.get(implClassName);
+            if (iClientFilterClass == null) {
+                throw new RuntimeException("no match iClientFilter for " + implClassName);
+            }
+            clientFilterChain.addClientFilter((ClientFilter) iClientFilterClass.newInstance());
+        }
+        CLIENT_FILTER_CHAIN = clientFilterChain;
     }
 }
