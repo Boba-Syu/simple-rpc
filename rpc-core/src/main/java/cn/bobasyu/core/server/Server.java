@@ -4,15 +4,13 @@ import cn.bobasyu.core.common.RpcDecoder;
 import cn.bobasyu.core.common.RpcEncoder;
 import cn.bobasyu.core.config.PropertiesBootstrap;
 import cn.bobasyu.core.config.ServerConfig;
+import cn.bobasyu.core.filter.ServerFilter;
 import cn.bobasyu.core.filter.server.ServerFilterChain;
 import cn.bobasyu.core.filter.server.ServerLogFilterImpl;
 import cn.bobasyu.core.filter.server.ServerTokenFilterImpl;
 import cn.bobasyu.core.registry.RegistryService;
 import cn.bobasyu.core.registry.URL;
-import cn.bobasyu.core.serialize.fastjson.FastJsonSerializeFactory;
-import cn.bobasyu.core.serialize.hessian.HessianSerializeFactory;
-import cn.bobasyu.core.serialize.jdk.JdkSerializeFactory;
-import cn.bobasyu.core.serialize.kryo.KryoSerializeFactory;
+import cn.bobasyu.core.serialize.SerializeFactory;
 import cn.bobasyu.core.utils.CommonUtils;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInitializer;
@@ -22,10 +20,11 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
-import static cn.bobasyu.core.common.RpcConstants.*;
-import static cn.bobasyu.core.common.RpcConstants.KRYO_SERIALIZE_TYPE;
-import static cn.bobasyu.core.common.cache.CommonClientCache.CLIENT_SERIALIZE_FACTORY;
+import java.util.LinkedHashMap;
+
+import static cn.bobasyu.core.common.cache.CommonClientCache.EXTENSION_LOADER;
 import static cn.bobasyu.core.common.cache.CommonServerCache.*;
+import static cn.bobasyu.core.spi.ExtensionLoader.EXTENSION_LOADER_CLASS_CACHE;
 
 /**
  * 服务端，使用Netty实现
@@ -40,32 +39,32 @@ public class Server {
 
     private RegistryService registryService;
 
-    public void initServerConfig() {
+    public void initServerConfig() throws Exception {
         ServerConfig serverConfig = PropertiesBootstrap.loadServerConfigFromLocal();
         this.setServerConfig(serverConfig);
-        // 初始化序列化策略
-        String serializeStrategy = serverConfig.getServerSerialize();
-        switch (serializeStrategy) {
-            case JDK_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new JdkSerializeFactory();
-                break;
-            case FAST_JSON_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new FastJsonSerializeFactory();
-                break;
-            case HESSIAN2_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new HessianSerializeFactory();
-                break;
-            case KRYO_SERIALIZE_TYPE:
-                CLIENT_SERIALIZE_FACTORY = new KryoSerializeFactory();
-                break;
-            default:
-                throw new RuntimeException("no match serialize strategy for" + serializeStrategy);
-        }
         SERVER_CONFIG = serverConfig;
-        // 初始化过滤链，指定过滤顺序
+        // 初始化线程池和队列配置
+        SERVER_CHANNEL_DISPATCHER.init(SERVER_CONFIG.getServerQueueSize(), SERVER_CONFIG.getServerBizThreadNums());
+        // 初始化序列化策略
+        String serverSerialize = serverConfig.getServerSerialize();
+        EXTENSION_LOADER.loadExtension(SerializeFactory.class);
+        LinkedHashMap<String, Class<?>> serializeFactoryClassMap = EXTENSION_LOADER_CLASS_CACHE.get(SerializeFactory.class.getName());
+        Class<?> serializeFactoryClass = serializeFactoryClassMap.get(serverSerialize);
+        if (serializeFactoryClass == null) {
+            throw new RuntimeException("no match serialize type for " + serverSerialize);
+        }
+        SERVER_SERIALIZE_FACTORY = (SerializeFactory) serializeFactoryClass.newInstance();
+        // 初始化过滤链
+        EXTENSION_LOADER.loadExtension(ServerFilter.class);
+        LinkedHashMap<String, Class<?>> serverFilterClassMap = EXTENSION_LOADER_CLASS_CACHE.get(ServerFilter.class.getName());
         ServerFilterChain serverFilterChain = new ServerFilterChain();
-        serverFilterChain.addServerFilter(new ServerLogFilterImpl());
-        serverFilterChain.addServerFilter(new ServerTokenFilterImpl());
+        for (String serverFilterKey : serverFilterClassMap.keySet()) {
+            Class<?> serverFilterClass = serverFilterClassMap.get(serverFilterKey);
+            if (serverFilterClass == null) {
+                throw new RuntimeException("no match iServerFilter type for " + serverFilterClass);
+            }
+            serverFilterChain.addServerFilter((ServerFilter) serverFilterClass.newInstance());
+        }
         SERVER_FILTER_CHAN = serverFilterChain;
     }
 

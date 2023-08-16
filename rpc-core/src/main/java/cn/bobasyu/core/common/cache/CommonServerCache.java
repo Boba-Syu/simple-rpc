@@ -2,9 +2,12 @@ package cn.bobasyu.core.common.cache;
 
 import cn.bobasyu.core.common.RpcInvocation;
 import cn.bobasyu.core.config.ServerConfig;
+import cn.bobasyu.core.dispatcher.ServerChannelDispatcher;
+import cn.bobasyu.core.filter.server.ServerBeforeFilterChain;
 import cn.bobasyu.core.filter.server.ServerFilterChain;
 import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.serialize.SerializeFactory;
+import cn.bobasyu.core.filter.server.ServerAfterFilterChain;
 import cn.bobasyu.core.server.ServiceWrapper;
 import io.netty.util.internal.ConcurrentSet;
 
@@ -29,5 +32,11 @@ public class CommonServerCache {
     public static ServerConfig SERVER_CONFIG;
 
     public static final Map<String, ServiceWrapper> PROVIDER_SERVICE_WRAPPER_MAP = new ConcurrentHashMap<>();
+
+    public static ServerBeforeFilterChain SERVER_BEFORE_FILTER_CHAIN;
+
+    public static ServerAfterFilterChain SERVER_AFTER_FILTER_CHAIN;
+
+    public static ServerChannelDispatcher SERVER_CHANNEL_DISPATCHER = new ServerChannelDispatcher();
 
 }
