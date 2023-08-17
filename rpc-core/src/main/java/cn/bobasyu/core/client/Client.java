@@ -28,6 +28,7 @@ import cn.bobasyu.core.serialize.kryo.KryoSerializeFactory;
 import cn.bobasyu.core.utils.CommonUtils;
 import com.alibaba.fastjson.JSON;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.EventLoopGroup;
@@ -136,11 +137,9 @@ public class Client {
 
     /**
      * 开启发送线程，专门从事将数据包发送给服务端
-     *
-     * @param channelFuture
      */
-    private void startClient(ChannelFuture channelFuture) {
-        Thread asyncSendJob = new Thread(new AsyncSendJob(channelFuture));
+    public void startClient() {
+        Thread asyncSendJob = new Thread(new AsyncSendJob());
         asyncSendJob.start();
     }
 
@@ -149,24 +148,24 @@ public class Client {
      */
     static class AsyncSendJob implements Runnable {
 
-        private ChannelFuture channelFuture;
-
-        public AsyncSendJob(ChannelFuture channelFuture) {
-            this.channelFuture = channelFuture;
-        }
-
         @Override
         public void run() {
             while (true) {
                 try {
                     // 阻塞模式
-                    RpcInvocation data = SEND_QUEUE.take();
+                    RpcInvocation rpcInvocation = SEND_QUEUE.take();
+                    ChannelFuture channelFuture = ConnectionHandler.getChannelFuture(rpcInvocation);
                     // 将RpcInvocation封装到RpcProtocol中
-                    String json = JSON.toJSONString(data);
-                    RpcProtocol rpcProtocol = new RpcProtocol(json.getBytes());
-
-                    //netty的通道负责发送数据给服务端
-                    channelFuture.channel().writeAndFlush(rpcProtocol);
+                    if (channelFuture != null) {
+                        Channel channel = channelFuture.channel();
+                        //如果出现服务端中断的情况需要兼容下
+                        if (!channel.isOpen()) {
+                            throw new RuntimeException("aim channel is not open!rpcInvocation is " + rpcInvocation);
+                        }
+                        RpcProtocol rpcProtocol = new RpcProtocol(CLIENT_SERIALIZE_FACTORY.serialize(rpcInvocation));
+                        //netty的通道负责发送数据给服务端
+                        channel.writeAndFlush(rpcProtocol);
+                    }
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }

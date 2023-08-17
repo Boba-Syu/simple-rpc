@@ -1,0 +1,3 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+cn.bobasyu.spring.config.IRpcServerAutoConfiguration,\
+cn.bobasyu.spring.config.IRpcClientAutoConfiguration

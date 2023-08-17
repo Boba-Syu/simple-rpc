@@ -7,6 +7,7 @@ import cn.bobasyu.core.dispatcher.ServerChannelDispatcher;
 import cn.bobasyu.core.filter.server.ServerBeforeFilterChain;
 import cn.bobasyu.core.filter.server.ServerFilterChain;
 import cn.bobasyu.core.registry.URL;
+import cn.bobasyu.core.registry.zookeeper.AbstractRegister;
 import cn.bobasyu.core.serialize.SerializeFactory;
 import cn.bobasyu.core.filter.server.ServerAfterFilterChain;
 import cn.bobasyu.core.server.ServiceWrapper;
@@ -41,5 +42,8 @@ public class CommonServerCache {
     public static ServerChannelDispatcher SERVER_CHANNEL_DISPATCHER = new ServerChannelDispatcher();
 
     public static final Map<String, ServerServiceSemaphoreWrapper> SERVER_SERVICE_SEMAPHORE_MAP = new ConcurrentHashMap<>(64);
+
+    public static AbstractRegister REGISTRY_SERVICE;
+
 
 }
