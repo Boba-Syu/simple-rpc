@@ -1,6 +1,7 @@
 package cn.bobasyu.core.common.cache;
 
 import cn.bobasyu.core.common.RpcInvocation;
+import cn.bobasyu.core.common.ServerServiceSemaphoreWrapper;
 import cn.bobasyu.core.config.ServerConfig;
 import cn.bobasyu.core.dispatcher.ServerChannelDispatcher;
 import cn.bobasyu.core.filter.server.ServerBeforeFilterChain;
@@ -38,5 +39,7 @@ public class CommonServerCache {
     public static ServerAfterFilterChain SERVER_AFTER_FILTER_CHAIN;
 
     public static ServerChannelDispatcher SERVER_CHANNEL_DISPATCHER = new ServerChannelDispatcher();
+
+    public static final Map<String, ServerServiceSemaphoreWrapper> SERVER_SERVICE_SEMAPHORE_MAP = new ConcurrentHashMap<>(64);
 
 }

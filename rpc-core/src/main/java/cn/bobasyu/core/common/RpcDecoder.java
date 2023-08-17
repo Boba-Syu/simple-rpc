@@ -21,24 +21,16 @@ public class RpcDecoder extends ByteToMessageDecoder {
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf byteBuf, List<Object> out) throws Exception {
         if (byteBuf.readableBytes() >= BASE_LENGTH) {
-            // 防止收到一些体积过大的包
-            if (byteBuf.readableBytes() > 1000) {
-                byteBuf.skipBytes(byteBuf.readableBytes());
-            }
-            int beginReader = byteBuf.readerIndex();
-            byteBuf.markReaderIndex();
-            // RpcProtocol的魔数
             if (byteBuf.readShort() != MAGIC_NUMBER) {
                 // 不是魔数开头，说明是非法的客户端发来的数据包
                 ctx.close();
                 return;
             }
-
             // RpcProtocol的contentLength字段
             int length = byteBuf.readInt();
             if (byteBuf.readableBytes() < length) {
                 // 长度不匹配，说明数据包不完整
-                byteBuf.readerIndex(beginReader);
+                ctx.close();
                 return;
             }
             // 解析content字段

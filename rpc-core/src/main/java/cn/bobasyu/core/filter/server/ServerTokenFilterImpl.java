@@ -1,5 +1,6 @@
 package cn.bobasyu.core.filter.server;
 
+import cn.bobasyu.core.annotation.SPI;
 import cn.bobasyu.core.common.RpcInvocation;
 import cn.bobasyu.core.filter.ServerFilter;
 import cn.bobasyu.core.server.ServiceWrapper;
@@ -10,6 +11,7 @@ import static cn.bobasyu.core.common.cache.CommonServerCache.PROVIDER_SERVICE_WR
 /**
  * 简单版本的token校验过滤器
  */
+@SPI("before")
 public class ServerTokenFilterImpl implements ServerFilter {
     @Override
     public void doFilter(RpcInvocation rpcInvocation) {

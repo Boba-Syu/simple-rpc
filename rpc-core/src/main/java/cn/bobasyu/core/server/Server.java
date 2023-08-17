@@ -1,27 +1,33 @@
 package cn.bobasyu.core.server;
 
+import cn.bobasyu.core.annotation.SPI;
 import cn.bobasyu.core.common.RpcDecoder;
 import cn.bobasyu.core.common.RpcEncoder;
 import cn.bobasyu.core.config.PropertiesBootstrap;
 import cn.bobasyu.core.config.ServerConfig;
 import cn.bobasyu.core.filter.ServerFilter;
+import cn.bobasyu.core.filter.server.ServerAfterFilterChain;
+import cn.bobasyu.core.filter.server.ServerBeforeFilterChain;
 import cn.bobasyu.core.filter.server.ServerFilterChain;
-import cn.bobasyu.core.filter.server.ServerLogFilterImpl;
-import cn.bobasyu.core.filter.server.ServerTokenFilterImpl;
 import cn.bobasyu.core.registry.RegistryService;
 import cn.bobasyu.core.registry.URL;
 import cn.bobasyu.core.serialize.SerializeFactory;
 import cn.bobasyu.core.utils.CommonUtils;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.DelimiterBasedFrameDecoder;
 
 import java.util.LinkedHashMap;
 
+import static cn.bobasyu.core.common.RpcConstants.DEFAULT_DECODE_CHAR;
 import static cn.bobasyu.core.common.cache.CommonClientCache.EXTENSION_LOADER;
 import static cn.bobasyu.core.common.cache.CommonServerCache.*;
 import static cn.bobasyu.core.spi.ExtensionLoader.EXTENSION_LOADER_CLASS_CACHE;
@@ -57,15 +63,21 @@ public class Server {
         // 初始化过滤链
         EXTENSION_LOADER.loadExtension(ServerFilter.class);
         LinkedHashMap<String, Class<?>> serverFilterClassMap = EXTENSION_LOADER_CLASS_CACHE.get(ServerFilter.class.getName());
-        ServerFilterChain serverFilterChain = new ServerFilterChain();
-        for (String serverFilterKey : serverFilterClassMap.keySet()) {
-            Class<?> serverFilterClass = serverFilterClassMap.get(serverFilterKey);
-            if (serverFilterClass == null) {
-                throw new RuntimeException("no match iServerFilter type for " + serverFilterClass);
+        ServerBeforeFilterChain serverBeforeFilterChain = new ServerBeforeFilterChain();
+        ServerAfterFilterChain serverAfterFilterChain = new ServerAfterFilterChain();        for (String serverFilterKey : serverFilterClassMap.keySet()) {
+            Class<?> iServerFilterClass = serverFilterClassMap.get(serverFilterKey);
+            if (iServerFilterClass == null) {
+                throw new RuntimeException("no match iServerFilter type for " + serverFilterKey);
             }
-            serverFilterChain.addServerFilter((ServerFilter) serverFilterClass.newInstance());
+            SPI spi = (SPI) iServerFilterClass.getDeclaredAnnotation(SPI.class);
+            if (spi != null && "before".equals(spi.value())) {
+                serverBeforeFilterChain.addServerFilter((ServerFilter) iServerFilterClass.newInstance());
+            } else if (spi != null && "after".equals(spi.value())) {
+                serverAfterFilterChain.addServerFilter((ServerFilter) iServerFilterClass.newInstance());
+            }
         }
-        SERVER_FILTER_CHAN = serverFilterChain;
+        SERVER_BEFORE_FILTER_CHAIN = serverBeforeFilterChain;
+        SERVER_AFTER_FILTER_CHAIN = serverAfterFilterChain;
     }
 
     public void startApplication() {
@@ -79,10 +91,13 @@ public class Server {
                 .option(ChannelOption.SO_SNDBUF, 16 * 1024)
                 .option(ChannelOption.SO_RCVBUF, 16 * 1024)
                 .option(ChannelOption.SO_KEEPALIVE, true)
+                .handler(new MaxConnectionLimitHandler(serverConfig.getMaxConnections()))
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel socketChannel) throws Exception {
                         System.out.println("初始化provider过程");
+                        ByteBuf delimiter = Unpooled.copiedBuffer(DEFAULT_DECODE_CHAR.getBytes());
+                        socketChannel.pipeline().addLast(new DelimiterBasedFrameDecoder(serverConfig.getMaxServerRequestData(), delimiter));
                         socketChannel.pipeline().addLast(new RpcEncoder());
                         socketChannel.pipeline().addLast(new RpcDecoder());
                         socketChannel.pipeline().addLast(new ServerHandler());
